@@ -6,20 +6,22 @@ export default function AltitudeGame() {
   const [altitude, setAltitude] = useState(0);
   const [oxygenLevel, setOxygenLevel] = useState(100);
   const [temperature, setTemperature] = useState(25);
-  const [speed, setSpeed] = useState(0);
-  const gameStateRef = useRef({ altitude: 0, velocity: 0 });
+  const [joystickActive, setJoystickActive] = useState({ up: false, down: false });
+  const characterAltitudeRef = useRef(0);
 
   useEffect(() => {
+    // Scene setup with enhanced atmosphere
     const scene = new THREE.Scene();
-    
-    // Dynamic sky color based on altitude
     const skyColor = new THREE.Color(0x87ceeb);
     scene.background = skyColor;
-    scene.fog = new THREE.FogExp2(0x87ceeb, 0.0015);
+    scene.fog = new THREE.FogExp2(0x87ceeb, 0.0008);
 
+    // Camera with better positioning
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-    camera.position.set(0, 5, 25);
+    camera.position.set(15, 8, 25);
+    camera.lookAt(0, 5, 0);
 
+    // Renderer with maximum quality settings
     const renderer = new THREE.WebGLRenderer({ 
       antialias: true, 
       alpha: true,
@@ -34,7 +36,7 @@ export default function AltitudeGame() {
     renderer.outputEncoding = THREE.sRGBEncoding;
     mountRef.current.appendChild(renderer.domElement);
 
-    // Enhanced lighting system
+    // Enhanced Lighting System
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
@@ -48,253 +50,349 @@ export default function AltitudeGame() {
     sunLight.shadow.camera.right = 300;
     sunLight.shadow.camera.top = 300;
     sunLight.shadow.camera.bottom = -300;
-    sunLight.shadow.bias = -0.0001;
+    sunLight.shadow.bias = -0.00015;
     sunLight.shadow.normalBias = 0.02;
     scene.add(sunLight);
 
-    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x8b7355, 0.7);
+    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x8b7355, 0.8);
     scene.add(hemiLight);
 
-    const fillLight = new THREE.DirectionalLight(0x9ec7ff, 0.4);
+    const fillLight = new THREE.DirectionalLight(0xadd8e6, 0.4);
     fillLight.position.set(-100, 50, -100);
     scene.add(fillLight);
 
-    // Highly detailed ground with varied terrain
+    // Ultra-detailed Ground with multiple noise layers
     const groundGeometry = new THREE.PlaneGeometry(800, 800, 200, 200);
     const vertices = groundGeometry.attributes.position.array;
     for (let i = 0; i < vertices.length; i += 3) {
       const x = vertices[i];
       const y = vertices[i + 1];
-      const dist = Math.sqrt(x * x + y * y);
-      vertices[i + 2] = Math.sin(x * 0.05) * Math.cos(y * 0.05) * 3 + 
-                        Math.random() * 2 - 
-                        dist * 0.002;
+      const noise1 = Math.sin(x * 0.05) * Math.cos(y * 0.05) * 2;
+      const noise2 = Math.sin(x * 0.1) * Math.cos(y * 0.1) * 1;
+      const noise3 = Math.random() * 0.8;
+      vertices[i + 2] = noise1 + noise2 + noise3;
     }
     groundGeometry.attributes.position.needsUpdate = true;
     groundGeometry.computeVertexNormals();
 
     const groundMaterial = new THREE.MeshStandardMaterial({ 
       color: 0x3a5f2a,
-      roughness: 0.95,
+      roughness: 0.98,
       metalness: 0.0,
-      flatShading: false
+      flatShading: false,
+      side: THREE.DoubleSide
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Add grass patches for realism
-    const grassGroup = new THREE.Group();
-    for (let i = 0; i < 150; i++) {
-      const grassGeometry = new THREE.ConeGeometry(0.3, 1.5, 4);
-      const grassMaterial = new THREE.MeshStandardMaterial({ 
-        color: Math.random() > 0.5 ? 0x2d4a1f : 0x3a5f2a,
-        roughness: 1.0
-      });
+    // Add grass patches using instanced meshes for performance
+    const grassGeometry = new THREE.ConeGeometry(0.3, 1.2, 6);
+    const grassMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x2d4a1f,
+      roughness: 1.0,
+      metalness: 0.0
+    });
+    
+    for (let i = 0; i < 300; i++) {
       const grass = new THREE.Mesh(grassGeometry, grassMaterial);
       grass.position.set(
         Math.random() * 400 - 200,
-        0,
+        0.6,
         Math.random() * 400 - 200
       );
       grass.rotation.y = Math.random() * Math.PI;
       grass.scale.set(
-        0.5 + Math.random() * 0.5,
-        0.5 + Math.random() * 1,
-        0.5 + Math.random() * 0.5
+        0.8 + Math.random() * 0.4,
+        0.8 + Math.random() * 0.6,
+        0.8 + Math.random() * 0.4
       );
       grass.castShadow = true;
-      grassGroup.add(grass);
+      scene.add(grass);
     }
-    scene.add(grassGroup);
 
-    // Multiple mountains with varied sizes
-    const mountains = [];
-    const mountainConfigs = [
-      { x: 0, z: -100, radius: 50, height: 150, color: 0x6b5944 },
-      { x: -80, z: -150, radius: 35, height: 100, color: 0x7a6a54 },
-      { x: 90, z: -180, radius: 40, height: 120, color: 0x5d4e3c },
-      { x: -150, z: -250, radius: 30, height: 80, color: 0x8b7a65 }
-    ];
+    // Ultra-detailed Mountain with complex geometry
+    const mountainGeometry = new THREE.ConeGeometry(50, 140, 64, 40);
+    const mountainVertices = mountainGeometry.attributes.position.array;
+    for (let i = 0; i < mountainVertices.length; i += 3) {
+      const x = mountainVertices[i];
+      const y = mountainVertices[i + 1];
+      const z = mountainVertices[i + 2];
+      const distance = Math.sqrt(x * x + z * z);
+      const heightFactor = 1 - (y / 70);
+      const noise = Math.sin(x * 0.3) * Math.cos(z * 0.3) * heightFactor * 4;
+      mountainVertices[i] += (Math.random() - 0.5) * 3 + noise;
+      mountainVertices[i + 1] += (Math.random() - 0.5) * 2;
+      mountainVertices[i + 2] += (Math.random() - 0.5) * 3 + noise;
+    }
+    mountainGeometry.attributes.position.needsUpdate = true;
+    mountainGeometry.computeVertexNormals();
 
-    mountainConfigs.forEach(config => {
-      const mountainGeometry = new THREE.ConeGeometry(config.radius, config.height, 64, 32);
-      const mountainVertices = mountainGeometry.attributes.position.array;
-      for (let i = 0; i < mountainVertices.length; i += 3) {
-        const noise = (Math.random() - 0.5) * 4;
-        mountainVertices[i] += noise;
-        mountainVertices[i + 1] += (Math.random() - 0.5) * 3;
-        mountainVertices[i + 2] += noise;
-      }
-      mountainGeometry.attributes.position.needsUpdate = true;
-      mountainGeometry.computeVertexNormals();
-
-      const mountainMaterial = new THREE.MeshStandardMaterial({ 
-        color: config.color,
-        roughness: 0.9,
-        metalness: 0.05,
-        flatShading: false
-      });
-      const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-      mountain.position.set(config.x, config.height / 2, config.z);
-      mountain.castShadow = true;
-      mountain.receiveShadow = true;
-      mountains.push(mountain);
-      scene.add(mountain);
-
-      // Snow cap
-      const snowHeight = config.height * 0.3;
-      const snowRadius = config.radius * 0.5;
-      const snowCapGeometry = new THREE.ConeGeometry(snowRadius, snowHeight, 32, 16);
-      const snowVertices = snowCapGeometry.attributes.position.array;
-      for (let i = 0; i < snowVertices.length; i += 3) {
-        snowVertices[i] += (Math.random() - 0.5) * 1.5;
-        snowVertices[i + 2] += (Math.random() - 0.5) * 1.5;
-      }
-      snowCapGeometry.attributes.position.needsUpdate = true;
-      snowCapGeometry.computeVertexNormals();
-
-      const snowMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0xfafafa,
-        roughness: 0.3,
-        metalness: 0.15,
-        emissive: 0xffffff,
-        emissiveIntensity: 0.1
-      });
-      const snowCap = new THREE.Mesh(snowCapGeometry, snowMaterial);
-      snowCap.position.set(config.x, config.height - snowHeight / 2, config.z);
-      snowCap.castShadow = true;
-      scene.add(snowCap);
+    const mountainMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x6b5944,
+      roughness: 0.95,
+      metalness: 0.05,
+      flatShading: false
     });
+    const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+    mountain.position.set(0, 70, -100);
+    mountain.castShadow = true;
+    mountain.receiveShadow = true;
+    scene.add(mountain);
 
-    // Enhanced character with better proportions
+    // Detailed Snow cap with layered effect
+    const snowCapGeometry = new THREE.ConeGeometry(28, 50, 64, 20);
+    const snowVertices = snowCapGeometry.attributes.position.array;
+    for (let i = 0; i < snowVertices.length; i += 3) {
+      const x = snowVertices[i];
+      const z = snowVertices[i + 2];
+      const noise = Math.sin(x * 0.5) * Math.cos(z * 0.5) * 1.5;
+      snowVertices[i] += (Math.random() - 0.5) * 1.8 + noise;
+      snowVertices[i + 2] += (Math.random() - 0.5) * 1.8 + noise;
+    }
+    snowCapGeometry.attributes.position.needsUpdate = true;
+    snowCapGeometry.computeVertexNormals();
+
+    const snowMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xffffff,
+      roughness: 0.3,
+      metalness: 0.15,
+      flatShading: false,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.1
+    });
+    const snowCap = new THREE.Mesh(snowCapGeometry, snowMaterial);
+    snowCap.position.set(0, 115, -100);
+    snowCap.castShadow = true;
+    snowCap.receiveShadow = true;
+    scene.add(snowCap);
+
+    // Add multiple distant mountains for depth
+    for (let i = 0; i < 8; i++) {
+      const distMountainGeometry = new THREE.ConeGeometry(30 + Math.random() * 20, 80 + Math.random() * 60, 32, 10);
+      const distMountainMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x5a4a3a,
+        roughness: 0.9,
+        metalness: 0.0
+      });
+      const distMountain = new THREE.Mesh(distMountainGeometry, distMountainMaterial);
+      distMountain.position.set(
+        (Math.random() - 0.5) * 400,
+        40 + Math.random() * 20,
+        -200 - Math.random() * 200
+      );
+      distMountain.castShadow = true;
+      scene.add(distMountain);
+    }
+
+    // MINECRAFT STEVE CHARACTER - High Detail
     const characterGroup = new THREE.Group();
     
-    const headGeometry = new THREE.SphereGeometry(0.7, 32, 32);
+    // Texture-like materials for pixelated Minecraft look
     const skinMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0xf4c2a8,
-      roughness: 0.6,
-      metalness: 0.1
+      color: 0xf4c896,
+      roughness: 0.8,
+      metalness: 0.0,
+      flatShading: true
     });
+    
+    const shirtMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x4a90a4,
+      roughness: 0.9,
+      metalness: 0.0,
+      flatShading: true
+    });
+    
+    const pantsMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x3b4a8a,
+      roughness: 0.9,
+      metalness: 0.0,
+      flatShading: true
+    });
+    
+    const shoeMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x2a2a2a,
+      roughness: 0.8,
+      metalness: 0.1,
+      flatShading: true
+    });
+    
+    const hairMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x4a3728,
+      roughness: 0.9,
+      metalness: 0.0,
+      flatShading: true
+    });
+
+    // Head (larger, blocky)
+    const headGeometry = new THREE.BoxGeometry(1.6, 1.6, 1.6);
     const head = new THREE.Mesh(headGeometry, skinMaterial);
-    head.position.y = 2.2;
+    head.position.y = 3.2;
     head.castShadow = true;
     characterGroup.add(head);
 
-    // Eyes
-    const eyeGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-    const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    // Hair/Top of head (blocky layer)
+    const hairGeometry = new THREE.BoxGeometry(1.65, 0.4, 1.65);
+    const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+    hair.position.y = 4.0;
+    hair.castShadow = true;
+    characterGroup.add(hair);
+
+    // Eyes (simple blocks)
+    const eyeGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.05);
+    const eyeMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x4a9cd4,
+      roughness: 0.3,
+      metalness: 0.2,
+      flatShading: true
+    });
     const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-    leftEye.position.set(-0.2, 2.3, 0.6);
+    leftEye.position.set(-0.4, 3.4, 0.8);
     characterGroup.add(leftEye);
+    
     const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-    rightEye.position.set(0.2, 2.3, 0.6);
+    rightEye.position.set(0.4, 3.4, 0.8);
     characterGroup.add(rightEye);
 
-    const bodyGeometry = new THREE.CylinderGeometry(0.6, 0.7, 2.0, 32);
-    const clothMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x2c5f8d,
+    // Mouth (simple block)
+    const mouthGeometry = new THREE.BoxGeometry(0.6, 0.15, 0.05);
+    const mouthMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x8b5a3c,
       roughness: 0.8,
-      metalness: 0.0
+      flatShading: true
     });
-    const body = new THREE.Mesh(bodyGeometry, clothMaterial);
-    body.position.y = 1.0;
+    const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+    mouth.position.set(0, 2.8, 0.8);
+    characterGroup.add(mouth);
+
+    // Body (torso) - rectangular and blocky
+    const bodyGeometry = new THREE.BoxGeometry(1.6, 2.4, 0.8);
+    const body = new THREE.Mesh(bodyGeometry, shirtMaterial);
+    body.position.y = 1.2;
     body.castShadow = true;
     characterGroup.add(body);
 
-    // Backpack
-    const backpackGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.4);
-    const backpackMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x8b4513,
-      roughness: 0.9
-    });
-    const backpack = new THREE.Mesh(backpackGeometry, backpackMaterial);
-    backpack.position.set(0, 1.3, -0.5);
-    backpack.castShadow = true;
-    characterGroup.add(backpack);
-
-    const armGeometry = new THREE.CylinderGeometry(0.18, 0.16, 1.4, 16);
-    const leftArm = new THREE.Mesh(armGeometry, clothMaterial);
-    leftArm.position.set(-0.8, 1.0, 0);
-    leftArm.rotation.z = 0.2;
+    // Arms - blocky rectangular prisms
+    const armGeometry = new THREE.BoxGeometry(0.6, 2.0, 0.6);
+    
+    const leftArm = new THREE.Mesh(armGeometry, shirtMaterial);
+    leftArm.position.set(-1.1, 1.4, 0);
     leftArm.castShadow = true;
     characterGroup.add(leftArm);
 
-    const rightArm = new THREE.Mesh(armGeometry, clothMaterial);
-    rightArm.position.set(0.8, 1.0, 0);
-    rightArm.rotation.z = -0.2;
+    const rightArm = new THREE.Mesh(armGeometry, shirtMaterial);
+    rightArm.position.set(1.1, 1.4, 0);
     rightArm.castShadow = true;
     characterGroup.add(rightArm);
 
-    const legGeometry = new THREE.CylinderGeometry(0.22, 0.2, 1.6, 16);
-    const leftLeg = new THREE.Mesh(legGeometry, clothMaterial);
-    leftLeg.position.set(-0.3, -0.8, 0);
+    // Hands (skin colored blocks)
+    const handGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    const leftHand = new THREE.Mesh(handGeometry, skinMaterial);
+    leftHand.position.set(-1.1, 0.2, 0);
+    leftHand.castShadow = true;
+    characterGroup.add(leftHand);
+
+    const rightHand = new THREE.Mesh(handGeometry, skinMaterial);
+    rightHand.position.set(1.1, 0.2, 0);
+    rightHand.castShadow = true;
+    characterGroup.add(rightHand);
+
+    // Legs - blocky rectangular prisms
+    const legGeometry = new THREE.BoxGeometry(0.7, 2.0, 0.7);
+    
+    const leftLeg = new THREE.Mesh(legGeometry, pantsMaterial);
+    leftLeg.position.set(-0.45, -0.8, 0);
     leftLeg.castShadow = true;
     characterGroup.add(leftLeg);
 
-    const rightLeg = new THREE.Mesh(legGeometry, clothMaterial);
-    rightLeg.position.set(0.3, -0.8, 0);
+    const rightLeg = new THREE.Mesh(legGeometry, pantsMaterial);
+    rightLeg.position.set(0.45, -0.8, 0);
     rightLeg.castShadow = true;
     characterGroup.add(rightLeg);
+
+    // Shoes (darker blocks at bottom)
+    const shoeGeometry = new THREE.BoxGeometry(0.7, 0.4, 0.9);
+    const leftShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+    leftShoe.position.set(-0.45, -1.8, 0.1);
+    leftShoe.castShadow = true;
+    characterGroup.add(leftShoe);
+
+    const rightShoe = new THREE.Mesh(shoeGeometry, shoeMaterial);
+    rightShoe.position.set(0.45, -1.8, 0.1);
+    rightShoe.castShadow = true;
+    characterGroup.add(rightShoe);
+
+    // Belt detail
+    const beltGeometry = new THREE.BoxGeometry(1.65, 0.3, 0.85);
+    const beltMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x2a2a2a,
+      roughness: 0.7,
+      metalness: 0.2,
+      flatShading: true
+    });
+    const belt = new THREE.Mesh(beltGeometry, beltMaterial);
+    belt.position.y = 0.15;
+    belt.castShadow = true;
+    characterGroup.add(belt);
 
     characterGroup.position.set(0, 0, 5);
     characterGroup.castShadow = true;
     scene.add(characterGroup);
 
-    // Volumetric clouds with better variety
+    // Ultra-realistic volumetric clouds
     const clouds = [];
     const cloudMaterial = new THREE.MeshStandardMaterial({ 
       color: 0xffffff,
       transparent: true,
       opacity: 0.85,
       roughness: 1,
-      metalness: 0
+      metalness: 0,
+      flatShading: false
     });
 
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 35; i++) {
       const cloudGroup = new THREE.Group();
-      const numParts = 10 + Math.floor(Math.random() * 8);
+      const numParts = 12 + Math.floor(Math.random() * 8);
       for (let j = 0; j < numParts; j++) {
         const cloudGeometry = new THREE.SphereGeometry(
-          Math.random() * 5 + 3, 
-          16, 
-          16
+          Math.random() * 5 + 4, 
+          24, 
+          24
         );
         const cloudPart = new THREE.Mesh(cloudGeometry, cloudMaterial.clone());
+        cloudPart.material.opacity = 0.7 + Math.random() * 0.2;
         cloudPart.position.set(
-          (Math.random() - 0.5) * 18,
-          (Math.random() - 0.5) * 4,
-          (Math.random() - 0.5) * 18
+          Math.random() * 16 - 8,
+          Math.random() * 4 - 2,
+          Math.random() * 16 - 8
         );
         cloudPart.scale.set(
-          1 + Math.random() * 0.6,
+          1 + Math.random() * 0.7,
           0.5 + Math.random() * 0.4,
-          1 + Math.random() * 0.6
+          1 + Math.random() * 0.7
         );
         cloudGroup.add(cloudPart);
       }
       cloudGroup.position.set(
-        Math.random() * 400 - 200,
+        Math.random() * 300 - 150,
         Math.random() * 100 + 40,
-        Math.random() * 400 - 200
+        Math.random() * 300 - 150
       );
-      clouds.push({
-        group: cloudGroup,
-        speed: 0.01 + Math.random() * 0.02
-      });
+      clouds.push(cloudGroup);
       scene.add(cloudGroup);
     }
 
-    // Altitude markers with better design
+    // Enhanced altitude markers with detailed design
     const markers = [];
     for (let i = 0; i <= 88; i += 10) {
-      const markerGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 16);
+      // Main pole
+      const markerGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3.0, 16);
       const markerMaterial = new THREE.MeshStandardMaterial({ 
-        color: i > 50 ? 0xcc0000 : 0x00aa00,
+        color: i > 50 ? 0xdd1111 : 0x11dd11,
         roughness: 0.5,
         metalness: 0.4,
-        emissive: i > 50 ? 0x440000 : 0x004400,
+        emissive: i > 50 ? 0x330000 : 0x003300,
         emissiveIntensity: 0.2
       });
       const marker = new THREE.Mesh(markerGeometry, markerMaterial);
@@ -303,325 +401,243 @@ export default function AltitudeGame() {
       markers.push(marker);
       scene.add(marker);
 
-      const signGeometry = new THREE.BoxGeometry(2, 0.8, 0.15);
+      // Base platform
+      const baseGeometry = new THREE.CylinderGeometry(0.5, 0.6, 0.3, 16);
+      const baseMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x444444,
+        roughness: 0.7,
+        metalness: 0.3
+      });
+      const base = new THREE.Mesh(baseGeometry, baseMaterial);
+      base.position.set(-12, i, 0);
+      base.castShadow = true;
+      scene.add(base);
+
+      // Top sphere
+      const topGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+      const top = new THREE.Mesh(topGeometry, markerMaterial);
+      top.position.set(-12, i + 3.2, 0);
+      top.castShadow = true;
+      scene.add(top);
+
+      // Sign board with better design
+      const signGeometry = new THREE.BoxGeometry(2.0, 0.8, 0.15);
       const signMaterial = new THREE.MeshStandardMaterial({ 
         color: 0xffffff,
         roughness: 0.4,
         metalness: 0.1
       });
       const sign = new THREE.Mesh(signGeometry, signMaterial);
-      sign.position.set(-12, i + 3.2, 0);
+      sign.position.set(-12, i + 2.8, 0);
       sign.castShadow = true;
       scene.add(sign);
 
-      // Number on sign
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 80px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${i * 100}m`, 128, 64);
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      const textMaterial = new THREE.MeshBasicMaterial({ map: texture });
-      const textGeometry = new THREE.PlaneGeometry(1.8, 0.7);
-      const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-      textMesh.position.set(-12, i + 3.2, 0.08);
-      scene.add(textMesh);
+      // Sign frame
+      const frameGeometry = new THREE.BoxGeometry(2.1, 0.9, 0.1);
+      const frameMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x222222,
+        roughness: 0.6,
+        metalness: 0.4
+      });
+      const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+      frame.position.set(-12, i + 2.8, -0.05);
+      scene.add(frame);
     }
 
-    // Birds for atmosphere
-    const birds = [];
-    for (let i = 0; i < 15; i++) {
-      const birdGeometry = new THREE.ConeGeometry(0.3, 0.8, 4);
-      const birdMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
-      const bird = new THREE.Mesh(birdGeometry, birdMaterial);
-      bird.rotation.x = Math.PI / 2;
-      bird.position.set(
+    // Add trees for environment detail
+    for (let i = 0; i < 50; i++) {
+      const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 4, 8);
+      const trunkMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x4a3020,
+        roughness: 0.95
+      });
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      
+      const leavesGeometry = new THREE.ConeGeometry(2, 5, 8);
+      const leavesMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x2d5016,
+        roughness: 0.9
+      });
+      const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+      leaves.position.y = 4.5;
+      
+      const tree = new THREE.Group();
+      tree.add(trunk);
+      tree.add(leaves);
+      tree.position.set(
         Math.random() * 200 - 100,
-        Math.random() * 60 + 20,
+        0,
         Math.random() * 200 - 100
       );
-      birds.push({
-        mesh: bird,
-        speed: 0.1 + Math.random() * 0.2,
-        radius: 30 + Math.random() * 50,
-        angle: Math.random() * Math.PI * 2,
-        height: bird.position.y
-      });
-      scene.add(bird);
+      tree.castShadow = true;
+      tree.receiveShadow = true;
+      scene.add(tree);
     }
 
-    // Particle system for atmosphere
-    const particleCount = 500;
-    const particleGeometry = new THREE.BufferGeometry();
-    const particlePositions = new Float32Array(particleCount * 3);
-    
-    for (let i = 0; i < particleCount * 3; i += 3) {
-      particlePositions[i] = Math.random() * 400 - 200;
-      particlePositions[i + 1] = Math.random() * 200;
-      particlePositions[i + 2] = Math.random() * 400 - 200;
+    // Add rocks for detail
+    for (let i = 0; i < 80; i++) {
+      const rockGeometry = new THREE.DodecahedronGeometry(Math.random() * 1.5 + 0.5, 0);
+      const rockMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x666666,
+        roughness: 0.95,
+        metalness: 0.05,
+        flatShading: true
+      });
+      const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+      rock.position.set(
+        Math.random() * 300 - 150,
+        0.5,
+        Math.random() * 300 - 150
+      );
+      rock.rotation.set(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI
+      );
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      scene.add(rock);
     }
-    
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    const particleMaterial = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.3,
-      transparent: true,
-      opacity: 0.6
-    });
-    const particles = new THREE.Points(particleGeometry, particleMaterial);
-    scene.add(particles);
 
     const maxAltitude = 88;
-    const climbSpeed = 0.5;
-    const descendSpeed = 0.5;
+    const speed = 0.3;
+    let animationTime = 0;
 
+    // Animation loop with enhanced effects
     function animate() {
       requestAnimationFrame(animate);
+      animationTime += 0.01;
 
-      const currentVelocity = gameStateRef.current.velocity;
-      gameStateRef.current.altitude += currentVelocity;
-      gameStateRef.current.altitude = Math.max(0, Math.min(maxAltitude, gameStateRef.current.altitude));
+      // Update character position based on joystick - PERSISTENT POSITION
+      if (joystickActive.up && characterAltitudeRef.current < maxAltitude) {
+        characterAltitudeRef.current += speed;
+      } else if (joystickActive.down && characterAltitudeRef.current > 0) {
+        characterAltitudeRef.current -= speed;
+      }
 
-      const altitude = gameStateRef.current.altitude;
-      characterGroup.position.y = altitude;
+      characterAltitudeRef.current = Math.max(0, Math.min(maxAltitude, characterAltitudeRef.current));
       
-      // Smooth camera follow
-      const targetCameraY = altitude + 8;
-      camera.position.y += (targetCameraY - camera.position.y) * 0.1;
-      camera.position.z = 25 + altitude * 0.1;
-      camera.lookAt(0, altitude + 3, 0);
-
-      // Dynamic sky and fog based on altitude
-      const altitudeRatio = altitude / maxAltitude;
-      const skyColorValue = 0x87ceeb * (1 - altitudeRatio * 0.5) + 0x1a1a3a * altitudeRatio * 0.5;
-      scene.background.setHex(skyColorValue);
-      scene.fog.color.setHex(skyColorValue);
-      scene.fog.density = 0.0015 + altitudeRatio * 0.003;
+      characterGroup.position.y = characterAltitudeRef.current;
+      camera.position.y = characterAltitudeRef.current + 8;
+      camera.lookAt(0, characterAltitudeRef.current + 3, 0);
 
       // Update stats
-      setAltitude(Math.round(altitude * 100));
-      const oxygenPercent = Math.max(30, 100 - (altitude / maxAltitude) * 70);
+      setAltitude(Math.round(characterAltitudeRef.current * 100));
+      const oxygenPercent = Math.max(30, 100 - (characterAltitudeRef.current / maxAltitude) * 70);
       setOxygenLevel(Math.round(oxygenPercent));
-      const temp = 25 - (altitude / maxAltitude) * 50;
+      const temp = 25 - (characterAltitudeRef.current / maxAltitude) * 50;
       setTemperature(Math.round(temp));
-      setSpeed(Math.abs(currentVelocity * 100).toFixed(1));
 
-      // Animate clouds
-      clouds.forEach((cloud) => {
-        cloud.group.position.x += cloud.speed;
-        if (cloud.group.position.x > 250) cloud.group.position.x = -250;
-        cloud.group.rotation.y += 0.0002;
+      // Dynamic sky color based on altitude
+      const skyBrightness = 1 - (characterAltitudeRef.current / maxAltitude) * 0.3;
+      scene.background.setRGB(
+        0.53 * skyBrightness,
+        0.81 * skyBrightness,
+        0.92 * skyBrightness
+      );
+
+      // Animate clouds with varying speeds and subtle rotation
+      clouds.forEach((cloud, index) => {
+        cloud.position.x += 0.012 * (1 + index * 0.03);
+        if (cloud.position.x > 200) cloud.position.x = -200;
+        cloud.rotation.y += 0.0003;
+        cloud.position.y += Math.sin(animationTime + index) * 0.01;
       });
 
-      // Animate birds
-      birds.forEach((bird) => {
-        bird.angle += bird.speed * 0.01;
-        bird.mesh.position.x = Math.cos(bird.angle) * bird.radius;
-        bird.mesh.position.z = Math.sin(bird.angle) * bird.radius;
-        bird.mesh.position.y = bird.height + Math.sin(bird.angle * 2) * 3;
-        bird.mesh.rotation.y = bird.angle + Math.PI / 2;
-      });
-
-      // Animate particles
-      const positions = particles.geometry.attributes.position.array;
-      for (let i = 0; i < positions.length; i += 3) {
-        positions[i + 1] -= 0.05;
-        if (positions[i + 1] < 0) positions[i + 1] = 200;
-      }
-      particles.geometry.attributes.position.needsUpdate = true;
-
-      // Character animations
-      const time = Date.now() * 0.001;
-      head.rotation.y = Math.sin(time * 0.5) * 0.15;
-      head.rotation.x = Math.sin(time * 0.3) * 0.05;
+      // Minecraft-style character animation (subtle block movement)
+      head.rotation.y = Math.sin(animationTime * 1.5) * 0.15;
       
-      if (Math.abs(currentVelocity) > 0.01) {
-        leftArm.rotation.z = 0.2 + Math.sin(time * 8) * 0.3;
-        rightArm.rotation.z = -0.2 - Math.sin(time * 8) * 0.3;
-        leftLeg.rotation.x = Math.sin(time * 8) * 0.4;
-        rightLeg.rotation.x = -Math.sin(time * 8) * 0.4;
+      if (joystickActive.up || joystickActive.down) {
+        // Walking animation
+        leftArm.rotation.x = Math.sin(animationTime * 4) * 0.5;
+        rightArm.rotation.x = Math.sin(animationTime * 4 + Math.PI) * 0.5;
+        leftLeg.rotation.x = Math.sin(animationTime * 4 + Math.PI) * 0.4;
+        rightLeg.rotation.x = Math.sin(animationTime * 4) * 0.4;
       } else {
-        leftArm.rotation.z += (0.2 - leftArm.rotation.z) * 0.1;
-        rightArm.rotation.z += (-0.2 - rightArm.rotation.z) * 0.1;
-        leftLeg.rotation.x *= 0.9;
-        rightLeg.rotation.x *= 0.9;
+        // Idle animation
+        leftArm.rotation.x = Math.sin(animationTime * 0.5) * 0.05;
+        rightArm.rotation.x = Math.sin(animationTime * 0.5 + Math.PI) * 0.05;
+        leftLeg.rotation.x = 0;
+        rightLeg.rotation.x = 0;
       }
+
+      // Subtle light movement for dynamic shadows
+      sunLight.position.x = 150 + Math.sin(animationTime * 0.1) * 20;
+      sunLight.position.z = 100 + Math.cos(animationTime * 0.1) * 20;
 
       renderer.render(scene, camera);
     }
 
     animate();
 
+    // Handle window resize
     function handleResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     }
     window.addEventListener('resize', handleResize);
 
+    // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
       mountRef.current?.removeChild(renderer.domElement);
+      renderer.dispose();
     };
-  }, []);
-
-  const handleMoveUp = (active) => {
-    if (active) {
-      gameStateRef.current.velocity = 0.5;
-    } else {
-      gameStateRef.current.velocity = 0;
-    }
-  };
-
-  const handleMoveDown = (active) => {
-    if (active) {
-      gameStateRef.current.velocity = -0.5;
-    } else {
-      gameStateRef.current.velocity = 0;
-    }
-  };
+  }, [joystickActive]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
       <div ref={mountRef} />
       
+      {/* Enhanced Stats Panel */}
       <div style={{
         position: 'absolute',
         top: '20px',
         right: '20px',
-        background: 'rgba(0, 0, 0, 0.9)',
+        background: 'linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(30,30,30,0.95) 100%)',
         color: 'white',
-        padding: '25px 30px',
+        padding: '28px',
         borderRadius: '20px',
         fontFamily: "'Segoe UI', Arial, sans-serif",
         minWidth: '240px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.7)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.1)',
         backdropFilter: 'blur(15px)',
         border: '2px solid rgba(255,255,255,0.15)'
       }}>
         <h2 style={{ 
-          margin: '0 0 20px 0', 
+          margin: '0 0 18px 0', 
           fontSize: '26px', 
+          background: 'linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
           borderBottom: '3px solid #4CAF50', 
           paddingBottom: '12px',
-          fontWeight: '700',
-          letterSpacing: '1px'
+          fontWeight: '700'
         }}>
-          📊 STATS
+          📊 Statistics
         </h2>
         <div style={{ fontSize: '18px', lineHeight: '2.4', fontWeight: '500' }}>
-          <div style={{ 
-            background: 'rgba(76, 175, 80, 0.2)', 
-            padding: '8px 12px', 
-            borderRadius: '8px',
-            marginBottom: '10px'
-          }}>
-            <strong>🏔️ Altitude:</strong> {altitude}m
-          </div>
-          <div style={{ 
-            background: oxygenLevel < 60 ? 'rgba(255, 68, 68, 0.2)' : 'rgba(76, 175, 80, 0.2)',
-            padding: '8px 12px', 
-            borderRadius: '8px',
+          <div style={{
+            background: 'rgba(76, 175, 80, 0.1)',
+            padding: '10px',
+            borderRadius: '10px',
             marginBottom: '10px',
-            color: oxygenLevel < 60 ? '#ff4444' : '#4CAF50'
+            borderLeft: '4px solid #4CAF50'
           }}>
-            <strong>💨 Oxygen:</strong> {oxygenLevel}%
+            <strong>🏔️ Altitude:</strong> <span style={{ float: 'right', color: '#4CAF50' }}>{altitude}m</span>
           </div>
           <div style={{ 
-            background: temperature < 0 ? 'rgba(0, 191, 255, 0.2)' : 'rgba(255, 140, 0, 0.2)',
-            padding: '8px 12px', 
-            borderRadius: '8px',
+            background: oxygenLevel < 60 ? 'rgba(255, 68, 68, 0.1)' : 'rgba(76, 175, 80, 0.1)',
+            padding: '10px',
+            borderRadius: '10px',
             marginBottom: '10px',
-            color: temperature < 0 ? '#00bfff' : '#ff8c00'
+            borderLeft: `4px solid ${oxygenLevel < 60 ? '#ff4444' : '#4CAF50'}`
           }}>
-            <strong>🌡️ Temp:</strong> {temperature}°C
+            <strong>💨 Oxygen:</strong> <span style={{ float: 'right', color: oxygenLevel < 60 ? '#ff4444' : '#4CAF50' }}>{oxygenLevel}%</span>
           </div>
           <div style={{ 
-            background: 'rgba(138, 43, 226, 0.2)', 
-            padding: '8px 12px', 
-            borderRadius: '8px'
-          }}>
-            <strong>⚡ Speed:</strong> {speed} m/s
-          </div>
-        </div>
-        <div style={{ 
-          marginTop: '18px', 
-          fontSize: '13px', 
-          color: '#bbb', 
-          borderTop: '2px solid #444', 
-          paddingTop: '12px',
-          fontStyle: 'italic'
-        }}>
-          Max: 8,800m (Mt. Everest) 🏔️
-        </div>
-      </div>
-
-      <div style={{
-        position: 'absolute',
-        bottom: '50px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        alignItems: 'center'
-      }}>
-        <button
-          onMouseDown={() => handleMoveUp(true)}
-          onMouseUp={() => handleMoveUp(false)}
-          onMouseLeave={() => handleMoveUp(false)}
-          onTouchStart={(e) => { e.preventDefault(); handleMoveUp(true); }}
-          onTouchEnd={(e) => { e.preventDefault(); handleMoveUp(false); }}
-          style={{
-            width: '100px',
-            height: '100px',
-            borderRadius: '50%',
-            border: '3px solid rgba(255,255,255,0.3)',
-            background: 'linear-gradient(145deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            fontSize: '45px',
-            cursor: 'pointer',
-            boxShadow: '0 8px 25px rgba(102, 126, 234, 0.5)',
-            transition: 'all 0.15s ease',
-            userSelect: 'none',
-            fontWeight: 'bold'
-          }}
-          onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-        >
-          ⬆️
-        </button>
-        <button
-          onMouseDown={() => handleMoveDown(true)}
-          onMouseUp={() => handleMoveDown(false)}
-          onMouseLeave={() => handleMoveDown(false)}
-          onTouchStart={(e) => { e.preventDefault(); handleMoveDown(true); }}
-          onTouchEnd={(e) => { e.preventDefault(); handleMoveDown(false); }}
-          style={{
-            width: '100px',
-            height: '100px',
-            borderRadius: '50%',
-            border: '3px solid rgba(255,255,255,0.3)',
-            background: 'linear-gradient(145deg, #f093fb 0%, #f5576c 100%)',
-            color: 'white',
-            fontSize: '45px',
-            cursor: 'pointer',
-            boxShadow: '0 8px 25px rgba(240, 147, 251, 0.5)',
-            transition: 'all 0.15s ease',
-            userSelect: 'none',
-            fontWeight: 'bold'
-          }}
-          onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-        >
-          ⬇️
-        </button>
-      </div>
-    </div>
-  );
-          }
+            background: temperature < 0 ? 'rgba(0, 191, 255, 0.1)' : 'rgba(255, 140, 0, 0.1)',
+            padding: '10px',
+            borderRadius:
