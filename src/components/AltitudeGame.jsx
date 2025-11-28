@@ -12,158 +12,250 @@ export default function AltitudeGame() {
     // Scene setup
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 50, 500);
+    scene.fog = new THREE.Fog(0x87ceeb, 100, 800);
 
     // Camera
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 5, 15);
+    camera.position.set(0, 5, 20);
     camera.lookAt(0, 5, 0);
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Renderer with realistic settings
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    renderer.outputEncoding = THREE.sRGBEncoding;
     mountRef.current.appendChild(renderer.domElement);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Realistic Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    sunLight.position.set(50, 100, 50);
+    const sunLight = new THREE.DirectionalLight(0xfff5e6, 1.5);
+    sunLight.position.set(100, 150, 100);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.far = 500;
-    sunLight.shadow.camera.left = -100;
-    sunLight.shadow.camera.right = 100;
-    sunLight.shadow.camera.top = 100;
-    sunLight.shadow.camera.bottom = -100;
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
+    sunLight.shadow.camera.far = 1000;
+    sunLight.shadow.camera.left = -200;
+    sunLight.shadow.camera.right = 200;
+    sunLight.shadow.camera.top = 200;
+    sunLight.shadow.camera.bottom = -200;
+    sunLight.shadow.bias = -0.0001;
     scene.add(sunLight);
 
-    // Ground
-    const groundGeometry = new THREE.PlaneGeometry(200, 200);
+    // Hemisphere light for realistic sky
+    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x8b7355, 0.6);
+    scene.add(hemiLight);
+
+    // Realistic Ground with texture-like appearance
+    const groundGeometry = new THREE.PlaneGeometry(500, 500, 100, 100);
+    const vertices = groundGeometry.attributes.position.array;
+    for (let i = 0; i < vertices.length; i += 3) {
+      vertices[i + 2] = Math.random() * 1.5;
+    }
+    groundGeometry.attributes.position.needsUpdate = true;
+    groundGeometry.computeVertexNormals();
+
     const groundMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x228b22,
-      roughness: 0.8,
-      metalness: 0.2
+      color: 0x3a5f2a,
+      roughness: 0.95,
+      metalness: 0.0,
+      flatShading: false
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Mountain
-    const mountainGeometry = new THREE.ConeGeometry(30, 100, 8);
+    // Realistic Mountain with detailed geometry
+    const mountainGeometry = new THREE.ConeGeometry(40, 120, 32, 20);
+    const mountainVertices = mountainGeometry.attributes.position.array;
+    for (let i = 0; i < mountainVertices.length; i += 3) {
+      mountainVertices[i] += (Math.random() - 0.5) * 3;
+      mountainVertices[i + 1] += (Math.random() - 0.5) * 2;
+      mountainVertices[i + 2] += (Math.random() - 0.5) * 3;
+    }
+    mountainGeometry.attributes.position.needsUpdate = true;
+    mountainGeometry.computeVertexNormals();
+
     const mountainMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x8b7355,
+      color: 0x6b5944,
       roughness: 0.9,
-      metalness: 0.1
+      metalness: 0.05,
+      flatShading: false
     });
     const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
-    mountain.position.set(0, 50, -50);
+    mountain.position.set(0, 60, -80);
     mountain.castShadow = true;
     mountain.receiveShadow = true;
     scene.add(mountain);
 
-    // Snow cap
-    const snowCapGeometry = new THREE.ConeGeometry(15, 30, 8);
+    // Realistic Snow cap with rough texture
+    const snowCapGeometry = new THREE.ConeGeometry(20, 40, 32, 10);
+    const snowVertices = snowCapGeometry.attributes.position.array;
+    for (let i = 0; i < snowVertices.length; i += 3) {
+      snowVertices[i] += (Math.random() - 0.5) * 1.5;
+      snowVertices[i + 2] += (Math.random() - 0.5) * 1.5;
+    }
+    snowCapGeometry.attributes.position.needsUpdate = true;
+    snowCapGeometry.computeVertexNormals();
+
     const snowMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0xffffff,
-      roughness: 0.3,
-      metalness: 0.1
+      color: 0xfafafa,
+      roughness: 0.4,
+      metalness: 0.1,
+      flatShading: false
     });
     const snowCap = new THREE.Mesh(snowCapGeometry, snowMaterial);
-    snowCap.position.set(0, 85, -50);
+    snowCap.position.set(0, 100, -80);
+    snowCap.castShadow = true;
+    snowCap.receiveShadow = true;
     scene.add(snowCap);
 
-    // Character (simple sphere with body)
+    // Realistic Character (human-like)
     const characterGroup = new THREE.Group();
     
-    const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-    const characterMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0xff6b6b,
-      roughness: 0.5,
-      metalness: 0.3
+    // Head
+    const headGeometry = new THREE.SphereGeometry(0.6, 32, 32);
+    const skinMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xf4c2a8,
+      roughness: 0.7,
+      metalness: 0.1
     });
-    const head = new THREE.Mesh(headGeometry, characterMaterial);
-    head.position.y = 1.5;
+    const head = new THREE.Mesh(headGeometry, skinMaterial);
+    head.position.y = 2;
     head.castShadow = true;
     characterGroup.add(head);
 
-    const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.5, 1.5, 32);
-    const body = new THREE.Mesh(bodyGeometry, characterMaterial);
-    body.position.y = 0.5;
+    // Body (torso)
+    const bodyGeometry = new THREE.CylinderGeometry(0.5, 0.6, 1.8, 32);
+    const clothMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x2c5f8d,
+      roughness: 0.8,
+      metalness: 0.0
+    });
+    const body = new THREE.Mesh(bodyGeometry, clothMaterial);
+    body.position.y = 0.9;
     body.castShadow = true;
     characterGroup.add(body);
+
+    // Arms
+    const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 16);
+    const leftArm = new THREE.Mesh(armGeometry, clothMaterial);
+    leftArm.position.set(-0.7, 0.9, 0);
+    leftArm.rotation.z = 0.3;
+    leftArm.castShadow = true;
+    characterGroup.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeometry, clothMaterial);
+    rightArm.position.set(0.7, 0.9, 0);
+    rightArm.rotation.z = -0.3;
+    rightArm.castShadow = true;
+    characterGroup.add(rightArm);
+
+    // Legs
+    const legGeometry = new THREE.CylinderGeometry(0.2, 0.18, 1.5, 16);
+    const leftLeg = new THREE.Mesh(legGeometry, clothMaterial);
+    leftLeg.position.set(-0.3, -0.75, 0);
+    leftLeg.castShadow = true;
+    characterGroup.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeometry, clothMaterial);
+    rightLeg.position.set(0.3, -0.75, 0);
+    rightLeg.castShadow = true;
+    characterGroup.add(rightLeg);
 
     characterGroup.position.set(0, 0, 5);
     scene.add(characterGroup);
 
-    // Clouds
+    // Realistic Clouds with volume
     const clouds = [];
     const cloudMaterial = new THREE.MeshStandardMaterial({ 
       color: 0xffffff,
       transparent: true,
-      opacity: 0.7,
-      roughness: 1
+      opacity: 0.8,
+      roughness: 1,
+      metalness: 0
     });
 
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 20; i++) {
       const cloudGroup = new THREE.Group();
-      for (let j = 0; j < 5; j++) {
-        const cloudGeometry = new THREE.SphereGeometry(Math.random() * 3 + 2, 16, 16);
+      const numParts = 8 + Math.floor(Math.random() * 5);
+      for (let j = 0; j < numParts; j++) {
+        const cloudGeometry = new THREE.SphereGeometry(
+          Math.random() * 4 + 3, 
+          16, 
+          16
+        );
         const cloudPart = new THREE.Mesh(cloudGeometry, cloudMaterial);
         cloudPart.position.set(
-          Math.random() * 8 - 4,
-          Math.random() * 2,
-          Math.random() * 8 - 4
+          Math.random() * 12 - 6,
+          Math.random() * 3 - 1,
+          Math.random() * 12 - 6
+        );
+        cloudPart.scale.set(
+          1 + Math.random() * 0.5,
+          0.6 + Math.random() * 0.3,
+          1 + Math.random() * 0.5
         );
         cloudGroup.add(cloudPart);
       }
       cloudGroup.position.set(
-        Math.random() * 150 - 75,
-        Math.random() * 60 + 20,
-        Math.random() * 150 - 75
+        Math.random() * 200 - 100,
+        Math.random() * 80 + 30,
+        Math.random() * 200 - 100
       );
       clouds.push(cloudGroup);
       scene.add(cloudGroup);
     }
 
-    // Altitude markers
+    // Altitude markers (realistic poles)
     const markers = [];
     for (let i = 0; i <= 88; i += 10) {
-      const markerGeometry = new THREE.BoxGeometry(0.2, 2, 0.2);
+      const markerGeometry = new THREE.CylinderGeometry(0.15, 0.15, 2.5, 16);
       const markerMaterial = new THREE.MeshStandardMaterial({ 
-        color: i > 50 ? 0xff0000 : 0x00ff00 
+        color: i > 50 ? 0xcc0000 : 0x00aa00,
+        roughness: 0.6,
+        metalness: 0.3
       });
       const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-      marker.position.set(-8, i, 0);
+      marker.position.set(-10, i + 1.25, 0);
+      marker.castShadow = true;
       markers.push(marker);
       scene.add(marker);
+
+      // Marker sign
+      const signGeometry = new THREE.BoxGeometry(1.5, 0.6, 0.1);
+      const signMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xffffff,
+        roughness: 0.5
+      });
+      const sign = new THREE.Mesh(signGeometry, signMaterial);
+      sign.position.set(-10, i + 2.5, 0);
+      sign.castShadow = true;
+      scene.add(sign);
     }
 
-    // Animation variables
+    // Animation variables - NOW PERSISTENT
     let characterAltitude = 0;
-    let velocity = 0;
     const maxAltitude = 88;
-    const speed = 0.3;
+    const speed = 0.4;
 
     // Animation loop
     function animate() {
       requestAnimationFrame(animate);
 
-      // Update character position based on joystick
+      // Update character position based on joystick - FIXED: Position stays!
       if (joystickActive.up && characterAltitude < maxAltitude) {
-        velocity = speed;
+        characterAltitude += speed;
       } else if (joystickActive.down && characterAltitude > 0) {
-        velocity = -speed;
-      } else {
-        velocity *= 0.9;
+        characterAltitude -= speed;
       }
+      // NO RESET - Position maintains!
 
-      characterAltitude += velocity;
       characterAltitude = Math.max(0, Math.min(maxAltitude, characterAltitude));
       
       characterGroup.position.y = characterAltitude;
@@ -177,16 +269,17 @@ export default function AltitudeGame() {
       const temp = 25 - (characterAltitude / maxAltitude) * 50;
       setTemperature(Math.round(temp));
 
-      // Animate clouds
+      // Animate clouds realistically
       clouds.forEach((cloud, index) => {
-        cloud.position.x += 0.02 * (1 + index * 0.1);
-        if (cloud.position.x > 100) cloud.position.x = -100;
-        cloud.rotation.y += 0.001;
+        cloud.position.x += 0.015 * (1 + index * 0.05);
+        if (cloud.position.x > 150) cloud.position.x = -150;
+        cloud.rotation.y += 0.0005;
       });
 
-      // Character animation
-      head.rotation.y += 0.02;
-      body.rotation.y = Math.sin(Date.now() * 0.001) * 0.1;
+      // Subtle character animation
+      head.rotation.y = Math.sin(Date.now() * 0.001) * 0.1;
+      leftArm.rotation.z = 0.3 + Math.sin(Date.now() * 0.002) * 0.1;
+      rightArm.rotation.z = -0.3 - Math.sin(Date.now() * 0.002) * 0.1;
 
       renderer.render(scene, camera);
     }
@@ -217,18 +310,20 @@ export default function AltitudeGame() {
         position: 'absolute',
         top: '20px',
         right: '20px',
-        background: 'rgba(0, 0, 0, 0.8)',
+        background: 'rgba(0, 0, 0, 0.85)',
         color: 'white',
-        padding: '20px',
+        padding: '25px',
         borderRadius: '15px',
         fontFamily: 'Arial, sans-serif',
-        minWidth: '200px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+        minWidth: '220px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255,255,255,0.1)'
       }}>
         <h2 style={{ margin: '0 0 15px 0', fontSize: '24px', borderBottom: '2px solid #4CAF50', paddingBottom: '10px' }}>
           📊 Statistics
         </h2>
-        <div style={{ fontSize: '18px', lineHeight: '2' }}>
+        <div style={{ fontSize: '18px', lineHeight: '2.2' }}>
           <div>
             <strong>🏔️ Altitude:</strong> {altitude}m
           </div>
@@ -249,45 +344,55 @@ export default function AltitudeGame() {
         position: 'absolute',
         top: '20px',
         left: '20px',
-        background: 'rgba(0, 0, 0, 0.8)',
+        background: 'rgba(0, 0, 0, 0.85)',
         color: 'white',
-        padding: '15px',
-        borderRadius: '10px',
+        padding: '20px',
+        borderRadius: '12px',
         fontFamily: 'Arial, sans-serif',
-        maxWidth: '250px'
+        maxWidth: '280px',
+        backdropFilter: 'blur(10px)',
+        border: '1px solid rgba(255,255,255,0.1)'
       }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '18px' }}>🎮 Controls</h3>
-        <p style={{ margin: '5px 0', fontSize: '14px' }}>Use joystick buttons below to move up/down</p>
+        <h3 style={{ margin: '0 0 12px 0', fontSize: '20px' }}>🎮 Controls</h3>
+        <p style={{ margin: '5px 0', fontSize: '15px', lineHeight: '1.6' }}>
+          Use joystick buttons to move up/down the mountain. Position is maintained!
+        </p>
       </div>
 
       {/* Joystick Controls */}
       <div style={{
         position: 'absolute',
-        bottom: '40px',
+        bottom: '50px',
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px',
+        gap: '15px',
         alignItems: 'center'
       }}>
         <button
           onMouseDown={() => setJoystickActive({ ...joystickActive, up: true })}
           onMouseUp={() => setJoystickActive({ ...joystickActive, up: false })}
+          onMouseLeave={() => setJoystickActive({ ...joystickActive, up: false })}
           onTouchStart={() => setJoystickActive({ ...joystickActive, up: true })}
           onTouchEnd={() => setJoystickActive({ ...joystickActive, up: false })}
           style={{
-            width: '80px',
-            height: '80px',
+            width: '90px',
+            height: '90px',
             borderRadius: '50%',
             border: 'none',
-            background: 'linear-gradient(145deg, #667eea 0%, #764ba2 100%)',
+            background: joystickActive.up 
+              ? 'linear-gradient(145deg, #5a6fd8 0%, #6540a0 100%)' 
+              : 'linear-gradient(145deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
-            fontSize: '36px',
+            fontSize: '40px',
             cursor: 'pointer',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            boxShadow: joystickActive.up 
+              ? '0 2px 10px rgba(0,0,0,0.4)' 
+              : '0 6px 20px rgba(0,0,0,0.4)',
             transition: 'all 0.1s',
-            userSelect: 'none'
+            userSelect: 'none',
+            transform: joystickActive.up ? 'scale(0.95)' : 'scale(1)'
           }}
         >
           ⬆️
@@ -295,20 +400,26 @@ export default function AltitudeGame() {
         <button
           onMouseDown={() => setJoystickActive({ ...joystickActive, down: true })}
           onMouseUp={() => setJoystickActive({ ...joystickActive, down: false })}
+          onMouseLeave={() => setJoystickActive({ ...joystickActive, down: false })}
           onTouchStart={() => setJoystickActive({ ...joystickActive, down: true })}
           onTouchEnd={() => setJoystickActive({ ...joystickActive, down: false })}
           style={{
-            width: '80px',
-            height: '80px',
+            width: '90px',
+            height: '90px',
             borderRadius: '50%',
             border: 'none',
-            background: 'linear-gradient(145deg, #f093fb 0%, #f5576c 100%)',
+            background: joystickActive.down 
+              ? 'linear-gradient(145deg, #e081e8 0%, #d4455a 100%)' 
+              : 'linear-gradient(145deg, #f093fb 0%, #f5576c 100%)',
             color: 'white',
-            fontSize: '36px',
+            fontSize: '40px',
             cursor: 'pointer',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+            boxShadow: joystickActive.down 
+              ? '0 2px 10px rgba(0,0,0,0.4)' 
+              : '0 6px 20px rgba(0,0,0,0.4)',
             transition: 'all 0.1s',
-            userSelect: 'none'
+            userSelect: 'none',
+            transform: joystickActive.down ? 'scale(0.95)' : 'scale(1)'
           }}
         >
           ⬇️
@@ -316,4 +427,4 @@ export default function AltitudeGame() {
       </div>
     </div>
   );
-        }
+          }
